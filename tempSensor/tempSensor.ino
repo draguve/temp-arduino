@@ -10,11 +10,18 @@
 
 #include "ESPRotary.h";
 
+#include "DHT.h"
+
+#define DHTPIN D6   
+
+#define DHTTYPE DHT11
 
 #define ROTARY_PIN1 D0
 #define ROTARY_PIN2 D1
 
 ESPRotary r = ESPRotary(ROTARY_PIN1, ROTARY_PIN2);
+DHT dht(DHTPIN, DHTTYPE);
+
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -42,6 +49,9 @@ ESP8266WebServer server(80);
 
 const int led = 13;
 int lines = 8;
+
+unsigned long last = 0;
+const long waitTime = 1000;
 
 void handleNotFound() {
   digitalWrite(led, 1);
@@ -120,26 +130,30 @@ void setup(void) {
   server.begin();
   Serial.println("HTTP server started");
   scrollText(WiFi.localIP().toString());
+
+  dht.begin();
   
 }
 
 void loop(void) {
+  
   r.loop();
   server.handleClient();
   MDNS.update();
 
   //update loop
-//  switch(getStatus()){
-//    case 0:
-//    text("Case 0");
-//    break;
-//    case 1:
-//    text("Case 1");
-//    break;
-//    case 2:
-//    text("Case 2");
-//    break;
-//  }
+  if(millis()-last >= waitTime){
+    switch(getStatus()){
+      case 0:
+      break;
+      case 1:
+      tempPage();
+      break;
+      case 2:
+      break;
+    }
+    last=millis();
+  }
 }
 
 // on change
@@ -158,12 +172,13 @@ void rotate(ESPRotary& r) {
     text("Case 0");
     break;
     case 1:
-    text("Case 1");
+    tempPage();
     break;
     case 2:
     text("Case 2");
     break;
   }
+  last=millis();
 }
 
 void text(String data){
@@ -190,4 +205,37 @@ void scrollText(String input) {
   display.println(input);
   display.display();      // Show initial text
   lines -= thisLine;
+}
+
+void tempPage(){
+  float h = dht.readHumidity();
+  // Read temperature as Celsius (the default)
+  float t = dht.readTemperature();
+  // Read temperature as Fahrenheit (isFahrenheit = true)
+  float f = dht.readTemperature(true);
+
+  // Check if any reads failed.
+  if (isnan(h) || isnan(t) || isnan(f)) {
+    Serial.println("Error: couldn't get temprature and humidity");
+  } else{
+    // routine for converting temp/hum floats to char arrays
+    char temp_buff[5]; char hum_buff[5];
+    char temp_disp_buff[11] = "Tmp:";
+    char hum_disp_buff[11] = "Hum:";
+    
+    // appending temp/hum to buffers
+    dtostrf(t,2,1,temp_buff);
+    strcat(temp_disp_buff,temp_buff);
+    dtostrf(h,2,1,hum_buff);
+    strcat(hum_disp_buff,hum_buff);
+    
+    // routine for displaying text for temp/hum readout
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,2);
+    display.println(temp_disp_buff);
+    display.println(hum_disp_buff);
+    display.display();
+  }
 }
