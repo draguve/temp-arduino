@@ -23,7 +23,7 @@
 #define ROTARY_PIN1 D0
 #define ROTARY_PIN2 D1
 
-String arr_days[]={"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
+String arr_days[]={"Sun","Mon","Tues","Wed","Thurs","Fri","Sat"};
 String date_time;
 
 ESPRotary r = ESPRotary(ROTARY_PIN1, ROTARY_PIN2);
@@ -126,7 +126,6 @@ void setup(void) {
   Serial.print("Connected to ");
   Serial.println(ssid);
   Serial.print("IP address: ");
-  display.clearDisplay();
   Serial.println(WiFi.localIP());
 
   if (MDNS.begin("draguve")) {
@@ -139,11 +138,11 @@ void setup(void) {
 
   server.begin();
   Serial.println("HTTP server started");
-  scrollText(WiFi.localIP().toString());
+  //scrollText(WiFi.localIP().toString());
 
   dht.begin();
   timeClient.begin();
-  
+  last = millis();
 }
 
 void loop(void) {
@@ -155,13 +154,12 @@ void loop(void) {
   //update loop
   if(millis()-last >= waitTime){
     timeClient.update();
-    Serial.println(timeClient.getFormattedTime());
     switch(getStatus()){
       case 0:
-      timeScreen("IN");
+      tempPage();
       break;
       case 1:
-      tempPage();
+      timeScreen("IN");
       break;
       case 2:
       timeScreen("US");
@@ -184,12 +182,14 @@ void rotate(ESPRotary& r) {
   //set loop
   switch(getStatus()){
     case 0:
-    timeScreen("IN");
-    break;
-    case 1:
     tempPage();
     break;
+    case 1:
+    timeClient.setTimeOffset(19800);
+    timeScreen("IN");
+    break;
     case 2:
+    timeClient.setTimeOffset(-25200);
     timeScreen("US");
     break;
   }
