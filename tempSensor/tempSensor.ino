@@ -3,6 +3,10 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 
+//ntp stuff
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -19,8 +23,14 @@
 #define ROTARY_PIN1 D0
 #define ROTARY_PIN2 D1
 
+String arr_days[]={"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
+String date_time;
+
 ESPRotary r = ESPRotary(ROTARY_PIN1, ROTARY_PIN2);
 DHT dht(DHTPIN, DHTTYPE);
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 19800, 60000);
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -132,6 +142,7 @@ void setup(void) {
   scrollText(WiFi.localIP().toString());
 
   dht.begin();
+  timeClient.begin();
   
 }
 
@@ -143,13 +154,17 @@ void loop(void) {
 
   //update loop
   if(millis()-last >= waitTime){
+    timeClient.update();
+    Serial.println(timeClient.getFormattedTime());
     switch(getStatus()){
       case 0:
+      timeScreen("IN");
       break;
       case 1:
       tempPage();
       break;
       case 2:
+      timeScreen("US");
       break;
     }
     last=millis();
@@ -169,13 +184,13 @@ void rotate(ESPRotary& r) {
   //set loop
   switch(getStatus()){
     case 0:
-    text("Case 0");
+    timeScreen("IN");
     break;
     case 1:
     tempPage();
     break;
     case 2:
-    text("Case 2");
+    timeScreen("US");
     break;
   }
   last=millis();
@@ -233,9 +248,61 @@ void tempPage(){
     display.clearDisplay();
     display.setTextSize(2);
     display.setTextColor(WHITE);
-    display.setCursor(0,2);
+    display.setCursor(0,0);
     display.println(temp_disp_buff);
     display.println(hum_disp_buff);
     display.display();
   }
+}
+
+void timeScreen(String place){
+  timeClient.update();
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(0,0);
+  int hh = timeClient.getHours();
+  int mm = timeClient.getMinutes();
+  int ss = timeClient.getSeconds();
+  
+  if(hh>12)
+  {
+    hh=hh-12;
+    display.print(hh);
+    display.print(":");
+    display.print(mm);
+    display.print(":");
+    display.print(ss);
+    display.println(" PM");
+  }
+  else
+  {
+    display.print(hh);
+    display.print(":");
+    display.print(mm);
+    display.print(":");
+    display.print(ss);
+    display.println(" AM");   
+  }
+
+  int day = timeClient.getDay();
+  display.println(arr_days[day] + " " + place);
+  
+  display.println(getDateString());
+  display.display();
+}
+
+String getDateString() {
+   time_t rawtime = timeClient.getEpochTime();
+   struct tm * ti;
+   ti = localtime (&rawtime);
+
+   uint16_t year = ti->tm_year + 1900;
+   String yearStr = String(year);
+
+   uint8_t month = ti->tm_mon + 1;
+   String monthStr = month < 10 ? "0" + String(month) : String(month);
+
+   uint8_t day = ti->tm_mday;
+   String dayStr = day < 10 ? "0" + String(day) : String(day);
+   return dayStr+"/"+monthStr+"/"+yearStr;
 }
